@@ -1,4 +1,4 @@
-# Copyright 2017-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# Copyright 2017-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"). You
 # may not use this file except in compliance with the License. A copy of
@@ -93,6 +93,18 @@ def test_gov_ecr_uri():
 def test_init(sagemaker_session):
     pca = PCA(num_components=55, sagemaker_session=sagemaker_session, **COMMON_ARGS)
     assert pca.num_components == 55
+    assert pca.enable_network_isolation() is False
+
+
+def test_init_enable_network_isolation(sagemaker_session):
+    pca = PCA(
+        num_components=55,
+        sagemaker_session=sagemaker_session,
+        enable_network_isolation=True,
+        **COMMON_ARGS
+    )
+    assert pca.num_components == 55
+    assert pca.enable_network_isolation() is True
 
 
 def test_init_all_pca_hyperparameters(sagemaker_session):

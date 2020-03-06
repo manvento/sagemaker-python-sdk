@@ -1,4 +1,4 @@
-# Copyright 2017-2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# Copyright 2017-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"). You
 # may not use this file except in compliance with the License. A copy of
@@ -15,12 +15,10 @@ from __future__ import absolute_import
 import contextlib
 import json
 
-from botocore import exceptions
-
 from sagemaker import utils
 
 PRINCIPAL_TEMPLATE = (
-    '["{account_id}", "{role_arn}", ' '"arn:aws:iam::{account_id}:role/{sagemaker_role}"] '
+    '["{account_id}", "{role_arn}", ' '"arn:{partition}:iam::{account_id}:role/{sagemaker_role}"] '
 )
 
 KEY_ALIAS = "SageMakerTestKMSKey"
@@ -62,11 +60,14 @@ def _get_kms_key_id(kms_client, alias):
 
 
 def _create_kms_key(
-    kms_client, account_id, role_arn=None, sagemaker_role="SageMakerRole", alias=KEY_ALIAS
+    kms_client, account_id, region, role_arn=None, sagemaker_role="SageMakerRole", alias=KEY_ALIAS
 ):
     if role_arn:
         principal = PRINCIPAL_TEMPLATE.format(
-            account_id=account_id, role_arn=role_arn, sagemaker_role=sagemaker_role
+            partition=utils._aws_partition(region),
+            account_id=account_id,
+            role_arn=role_arn,
+            sagemaker_role=sagemaker_role,
         )
     else:
         principal = '"{account_id}"'.format(account_id=account_id)
@@ -85,7 +86,7 @@ def _create_kms_key(
 
 
 def _add_role_to_policy(
-    kms_client, account_id, role_arn, alias=KEY_ALIAS, sagemaker_role="SageMakerRole"
+    kms_client, account_id, role_arn, region, alias=KEY_ALIAS, sagemaker_role="SageMakerRole"
 ):
     key_id = _get_kms_key_id(kms_client, alias)
     policy = kms_client.get_key_policy(KeyId=key_id, PolicyName=POLICY_NAME)
@@ -94,7 +95,10 @@ def _add_role_to_policy(
 
     if role_arn not in principal or sagemaker_role not in principal:
         principal = PRINCIPAL_TEMPLATE.format(
-            account_id=account_id, role_arn=role_arn, sagemaker_role=sagemaker_role
+            partition=utils._aws_partition(region),
+            account_id=account_id,
+            role_arn=role_arn,
+            sagemaker_role=sagemaker_role,
         )
 
         kms_client.put_key_policy(
@@ -117,48 +121,49 @@ def get_or_create_kms_key(
     account_id = sts_client.get_caller_identity()["Account"]
 
     if kms_key_arn is None:
-        return _create_kms_key(kms_client, account_id, role_arn, sagemaker_role, alias)
+        return _create_kms_key(kms_client, account_id, region, role_arn, sagemaker_role, alias)
 
     if role_arn:
-        _add_role_to_policy(kms_client, account_id, role_arn, alias, sagemaker_role)
+        _add_role_to_policy(kms_client, account_id, role_arn, region, alias, sagemaker_role)
 
     return kms_key_arn
 
 
-KMS_BUCKET_POLICY = """{
+KMS_BUCKET_POLICY = """{{
   "Version": "2012-10-17",
   "Id": "PutObjPolicy",
   "Statement": [
-    {
+    {{
       "Sid": "DenyIncorrectEncryptionHeader",
       "Effect": "Deny",
       "Principal": "*",
       "Action": "s3:PutObject",
-      "Resource": "arn:aws:s3:::%s/*",
-      "Condition": {
-        "StringNotEquals": {
-          "s3:x-amz-server-side-encryption": "aws:kms"
-        }
-      }
-    },
-    {
+      "Resource": "arn:{partition}:s3:::{bucket_name}/*",
+      "Condition": {{
+        "StringNotEquals": {{
+          "s3:x-amz-server-side-encryption": "{partition}:kms"
+        }}
+      }}
+    }},
+    {{
       "Sid": "DenyUnEncryptedObjectUploads",
       "Effect": "Deny",
       "Principal": "*",
       "Action": "s3:PutObject",
-      "Resource": "arn:aws:s3:::%s/*",
-      "Condition": {
-        "Null": {
+      "Resource": "arn:{partition}:s3:::{bucket_name}/*",
+      "Condition": {{
+        "Null": {{
           "s3:x-amz-server-side-encryption": "true"
-        }
-      }
-    }
+        }}
+      }}
+    }}
   ]
-}"""
+}}"""
 
 
 @contextlib.contextmanager
-def bucket_with_encryption(boto_session, sagemaker_role):
+def bucket_with_encryption(sagemaker_session, sagemaker_role):
+    boto_session = sagemaker_session.boto_session
     region = boto_session.region_name
     sts_client = boto_session.client(
         "sts", region_name=region, endpoint_url=utils.sts_regional_endpoint(region)
@@ -168,33 +173,23 @@ def bucket_with_encryption(boto_session, sagemaker_role):
     role_arn = sts_client.get_caller_identity()["Arn"]
 
     kms_client = boto_session.client("kms")
-    kms_key_arn = _create_kms_key(kms_client, account, role_arn, sagemaker_role, None)
+    kms_key_arn = _create_kms_key(kms_client, account, region, role_arn, sagemaker_role, None)
 
     region = boto_session.region_name
     bucket_name = "sagemaker-{}-{}-with-kms".format(region, account)
 
-    s3 = boto_session.client("s3")
-    try:
-        # 'us-east-1' cannot be specified because it is the default region:
-        # https://github.com/boto/boto3/issues/125
-        if region == "us-east-1":
-            s3.create_bucket(Bucket=bucket_name)
-        else:
-            s3.create_bucket(
-                Bucket=bucket_name, CreateBucketConfiguration={"LocationConstraint": region}
-            )
+    sagemaker_session._create_s3_bucket_if_it_does_not_exist(bucket_name=bucket_name, region=region)
 
-    except exceptions.ClientError as e:
-        if e.response["Error"]["Code"] != "BucketAlreadyOwnedByYou":
-            raise
-
-    s3.put_bucket_encryption(
+    s3_client = boto_session.client("s3", region_name=region)
+    s3_client.put_bucket_encryption(
         Bucket=bucket_name,
         ServerSideEncryptionConfiguration={
             "Rules": [
                 {
                     "ApplyServerSideEncryptionByDefault": {
-                        "SSEAlgorithm": "aws:kms",
+                        "SSEAlgorithm": "{partition}:kms".format(
+                            partition=utils._aws_partition(region)
+                        ),
                         "KMSMasterKeyID": kms_key_arn,
                     }
                 }
@@ -202,7 +197,12 @@ def bucket_with_encryption(boto_session, sagemaker_role):
         },
     )
 
-    s3.put_bucket_policy(Bucket=bucket_name, Policy=KMS_BUCKET_POLICY % (bucket_name, bucket_name))
+    s3_client.put_bucket_policy(
+        Bucket=bucket_name,
+        Policy=KMS_BUCKET_POLICY.format(
+            partition=utils._aws_partition(region), bucket_name=bucket_name
+        ),
+    )
 
     yield "s3://" + bucket_name, kms_key_arn
 

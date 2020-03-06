@@ -1,4 +1,4 @@
-# Copyright 2017-2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# Copyright 2017-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"). You
 # may not use this file except in compliance with the License. A copy of
@@ -41,6 +41,7 @@ def test_pca(sagemaker_session, cpu_instance_type):
             train_instance_type=cpu_instance_type,
             num_components=48,
             sagemaker_session=sagemaker_session,
+            enable_network_isolation=True,
         )
 
         pca.algorithm_mode = "randomized"
@@ -50,7 +51,10 @@ def test_pca(sagemaker_session, cpu_instance_type):
 
     with timeout_and_delete_endpoint_by_name(job_name, sagemaker_session):
         pca_model = sagemaker.amazon.pca.PCAModel(
-            model_data=pca.model_data, role="SageMakerRole", sagemaker_session=sagemaker_session
+            model_data=pca.model_data,
+            role="SageMakerRole",
+            sagemaker_session=sagemaker_session,
+            enable_network_isolation=True,
         )
         predictor = pca_model.deploy(
             initial_instance_count=1, instance_type=cpu_instance_type, endpoint_name=job_name

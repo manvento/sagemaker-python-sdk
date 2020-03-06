@@ -1,5 +1,345 @@
 # Changelog
 
+## v1.50.18.post0 (2020-03-05)
+
+### Documentation Changes
+
+ * correct Estimator code_location default S3 path
+
+## v1.50.18 (2020-03-04)
+
+### Bug Fixes and Other Changes
+
+ * change default compile model max run to 15 mins
+
+## v1.50.17.post0 (2020-03-03)
+
+### Testing and Release Infrastructure
+
+ * fix PR builds to run on changes to their own buildspecs
+ * programmatically determine partition based on region
+
+## v1.50.17 (2020-02-27)
+
+### Bug Fixes and Other Changes
+
+ * upgrade framework versions
+
+## v1.50.16 (2020-02-26)
+
+### Bug Fixes and Other Changes
+
+ * use sagemaker_session when initializing Constraints and Statistics
+ * add sagemaker_session parameter to DataCaptureConfig
+ * make AutoML.deploy use self.sagemaker_session by default
+
+### Testing and Release Infrastructure
+
+ * unset region during integ tests
+ * use sagemaker_session fixture in all Airflow tests
+ * remove remaining TF legacy mode integ tests
+
+## v1.50.15 (2020-02-25)
+
+### Bug Fixes and Other Changes
+
+ * enable Neo integ tests
+
+## v1.50.14.post0 (2020-02-24)
+
+### Testing and Release Infrastructure
+
+ * remove TF framework mode notebooks from PR build
+ * don't create docker network for all integ tests
+
+## v1.50.14 (2020-02-20)
+
+### Bug Fixes and Other Changes
+
+ * don't use os.path.join for S3 path when repacking TFS model
+ * dynamically determine AWS domain based on region
+
+## v1.50.13 (2020-02-19)
+
+### Bug Fixes and Other Changes
+
+ * allow download_folder to download file even if bucket is more restricted
+
+### Testing and Release Infrastructure
+
+ * configure pylint to recognize boto3 and botocore as third-party imports
+ * add multiple notebooks to notebook PR build
+
+## v1.50.12 (2020-02-17)
+
+### Bug Fixes and Other Changes
+
+ * enable network isolation for amazon estimators
+
+### Documentation Changes
+
+ * clarify channel environment variables in PyTorch documentation
+
+## v1.50.11 (2020-02-13)
+
+### Bug Fixes and Other Changes
+
+ * fix HyperparameterTuner.attach for Marketplace algorithms
+ * move requests library from required packages to test dependencies
+ * create Session or LocalSession if not specified in Model
+
+### Documentation Changes
+
+ * remove hardcoded list of target devices in compile()
+ * Fix typo with SM_MODEL_DIR, missing quotes
+
+## v1.50.10.post0 (2020-02-12)
+
+### Documentation Changes
+
+ * add documentation guidelines to CONTRIBUTING.md
+ * Removed section numbering
+
+## v1.50.10 (2020-02-11)
+
+### Bug Fixes and Other Changes
+
+ * remove NEO_ALLOWED_TARGET_INSTANCE_FAMILY
+
+## v1.50.9.post0 (2020-02-06)
+
+### Documentation Changes
+
+ * remove labels from issue templates
+
+## v1.50.9 (2020-02-04)
+
+### Bug Fixes and Other Changes
+
+ * account for EI and version-based ECR repo naming in serving_image_uri()
+
+### Documentation Changes
+
+ * correct broken AutoML API documentation link
+ * fix MXNet version lists
+
+## v1.50.8 (2020-01-30)
+
+### Bug Fixes and Other Changes
+
+ * disable Debugger defaults in unsupported regions
+ * modify session and kms_utils to check for S3 bucket before creation
+ * update docker-compose and PyYAML dependencies
+ * enable smdebug for Horovod (MPI) training setup
+ * create lib dir for dependencies safely (only if it doesn't exist yet).
+ * create the correct session for MultiDataModel
+
+### Documentation Changes
+
+ * update links to the local mode notebooks examples.
+ * Remove outdated badges from README
+ * update links to TF notebook examples to link to script mode examples.
+ * clean up headings, verb tenses, names, etc. in MXNet overview
+ * Update SageMaker operator Helm chart installation guide
+
+### Testing and Release Infrastructure
+
+ * choose faster notebook for notebook PR build
+ * properly fail PR build if has-matching-changes fails
+ * properly fail PR build if has-matching-changes fails
+
+## v1.50.7 (2020-01-20)
+
+### Bug fixes and other changes
+
+ * do not use script for TFS when entry_point is not provided
+ * remove usage of pkg_resources
+ * update py2 warning message since python 2 is deprecated
+ * cleanup experiments, trials, and trial components in integ tests
+
+## v1.50.6.post0 (2020-01-20)
+
+### Documentation changes
+
+ * add additional information to Transformer class transform function doc string
+
+## v1.50.6 (2020-01-18)
+
+### Bug fixes and other changes
+
+ * Append serving to model framework name for PyTorch, MXNet, and TensorFlow
+
+## v1.50.5 (2020-01-17)
+
+### Bug fixes and other changes
+
+ * Use serving_image_uri for Airflow
+
+### Documentation changes
+
+ * revise Processing docstrings for formatting and class links
+ * Add processing readthedocs
+
+## v1.50.4 (2020-01-16)
+
+### Bug fixes and other changes
+
+ * Remove version number from default version comment
+ * remove remaining instances of python-dateutil pin
+ * upgrade boto3 and remove python-dateutil pin
+
+### Documentation changes
+
+ * Add issue templates and configure issue template chooser
+ * Update error type in delete_endpoint docstring
+ * add version requirement for using "requirements.txt" when serving an MXNet model
+ * update container dependency versions for MXNet and PyTorch
+ * Update supported versions of PyTorch
+
+## v1.50.3 (2020-01-15)
+
+### Bug fixes and other changes
+
+ * ignore private Automatic Model Tuning hyperparameter when attaching AlgorithmEstimator
+
+### Documentation changes
+
+ * add Debugger API docs
+
+## v1.50.2 (2020-01-14)
+
+### Bug fixes and other changes
+
+ * add tests to quick canary
+ * honor 'wait' flag when updating endpoint
+ * add default framework version warning message in Model classes
+ * Adding role arn explanation for sagemaker role
+ * allow predictor to be returned from AutoML.deploy()
+ * add PR checklist item about unique_name_from_base()
+ * use unique_name_from_base for multi-algo tuning test
+ * update copyright year in license header
+
+### Documentation changes
+
+ * add version requirement for using "requirement.txt" when serving a PyTorch model
+ * add SageMaker Debugger overview
+ * clarify requirements.txt usage for Chainer, MXNet, and Scikit-learn
+ * change "associate" to "create" for OpenID connector
+ * fix typo and improve clarity on installing packages via "requirements.txt"
+
+## v1.50.1 (2020-01-07)
+
+### Bug fixes and other changes
+
+ * fix PyTorchModel deployment crash on Windows
+ * make PyTorch empty framework_version warning include the latest PyTorch version
+
+## v1.50.0 (2020-01-06)
+
+### Features
+
+ * allow disabling debugger_hook_config
+
+### Bug fixes and other changes
+
+ * relax urllib3 and requests restrictions.
+ * Add uri as return statement for upload_string_as_file_body
+ * refactor logic in fw_utils and fill in docstrings
+ * increase poll from 5 to 30 for DescribeEndpoint lambda.
+ * fix test_auto_ml tests for regions without ml.c4.xlarge hosts.
+ * fix test_processing for regions without m4.xlarge instances.
+ * reduce test's describe frequency to eliminate throttling error.
+ * Increase number of retries when describing an endpoint since tf-2.0 has larger images and takes longer to start.
+
+### Documentation changes
+
+ * generalize Model Monitor documentation from SageMaker Studio tutorial
+
+## v1.49.0 (2019-12-23)
+
+### Features
+
+ * Add support for TF-2.0.0.
+ * create ProcessingJob from ARN and from name
+
+### Bug fixes and other changes
+
+ * Make tf tests tf-1.15 and tf-2.0 compatible.
+
+### Documentation changes
+
+ * add Model Monitor documentation
+ * add link to Amazon algorithm estimator parent class to clarify **kwargs
+
+## v1.48.1 (2019-12-18)
+
+### Bug fixes and other changes
+
+ * use name_from_base in auto_ml.py but unique_name_from_base in tests.
+ * make test's custom bucket include region and account name.
+ * add Keras to the list of Neo-supported frameworks
+
+### Documentation changes
+
+ * add link to parent classes to clarify **kwargs
+ * add link to framework-related parent classes to clarify **kwargs
+
+## v1.48.0 (2019-12-17)
+
+### Features
+
+ * allow setting the default bucket in Session
+
+### Bug fixes and other changes
+
+ * set integration test parallelization to 512
+ * shorten base job name to avoid collision
+ * multi model integration test to create ECR repo with unique names to allow independent parallel executions
+
+## v1.47.1 (2019-12-16)
+
+### Bug fixes and other changes
+
+ * Revert "feature: allow setting the default bucket in Session (#1168)"
+
+### Documentation changes
+
+ * add AutoML README
+ * add missing classes to API docs
+
+## v1.47.0 (2019-12-13)
+
+### Features
+
+ * allow setting the default bucket in Session
+
+### Bug fixes and other changes
+
+ * allow processing users to run code in s3
+
+## v1.46.0 (2019-12-12)
+
+### Features
+
+ * support Multi-Model endpoints
+
+### Bug fixes and other changes
+
+ * update PR template with items about tests, regional endpoints, and API docs
+
+## v1.45.2 (2019-12-10)
+
+### Bug fixes and other changes
+
+ * modify schedule cleanup to abide by latest validations
+ * lower log level when getting execution role from a SageMaker Notebook
+ * Fix "ValueError: too many values to unpack (expected 2)" is occurred in windows local mode
+ * allow ModelMonitor and Processor to take IAM role names (in addition to ARNs)
+
+### Documentation changes
+
+ * mention that the entry_point needs to be named inference.py for tfs
+
 ## v1.45.1 (2019-12-06)
 
 ### Bug fixes and other changes

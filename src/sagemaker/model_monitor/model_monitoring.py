@@ -1,4 +1,4 @@
-# Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"). You
 # may not use this file except in compliance with the License. A copy of
@@ -278,7 +278,7 @@ class ModelMonitor(object):
         normalized_monitoring_output = self._normalize_monitoring_output(output=output)
 
         statistics_object, constraints_object = self._get_baseline_files(
-            statistics=statistics, constraints=constraints
+            statistics=statistics, constraints=constraints, sagemaker_session=self.sagemaker_session
         )
 
         statistics_s3_uri = None
@@ -402,7 +402,7 @@ class ModelMonitor(object):
             }
 
         statistics_object, constraints_object = self._get_baseline_files(
-            statistics=statistics, constraints=constraints
+            statistics=statistics, constraints=constraints, sagemaker_session=self.sagemaker_session
         )
 
         statistics_s3_uri = None
@@ -781,7 +781,7 @@ class ModelMonitor(object):
         return name_from_base(base=base_name)
 
     @staticmethod
-    def _get_baseline_files(statistics, constraints):
+    def _get_baseline_files(statistics, constraints, sagemaker_session=None):
         """Populates baseline values if possible.
 
         Args:
@@ -791,6 +791,9 @@ class ModelMonitor(object):
             constraints (sagemaker.model_monitor.Constraints or str): The constraints object or str.
                 If none, this method will attempt to retrieve a previously baselined constraints
                 object.
+            sagemaker_session (sagemaker.session.Session): Session object which manages interactions
+                with Amazon SageMaker APIs and any other AWS services needed. If not specified, one
+                is created using the default AWS configuration chain.
 
         Returns:
             sagemaker.model_monitor.Statistics, sagemaker.model_monitor.Constraints: The Statistics
@@ -799,9 +802,13 @@ class ModelMonitor(object):
 
         """
         if statistics is not None and isinstance(statistics, string_types):
-            statistics = Statistics.from_s3_uri(statistics_file_s3_uri=statistics)
+            statistics = Statistics.from_s3_uri(
+                statistics_file_s3_uri=statistics, sagemaker_session=sagemaker_session
+            )
         if constraints is not None and isinstance(constraints, string_types):
-            constraints = Constraints.from_s3_uri(constraints_file_s3_uri=constraints)
+            constraints = Constraints.from_s3_uri(
+                constraints_file_s3_uri=constraints, sagemaker_session=sagemaker_session
+            )
 
         return statistics, constraints
 
@@ -1240,7 +1247,7 @@ class DefaultModelMonitor(ModelMonitor):
         )
 
         statistics_object, constraints_object = self._get_baseline_files(
-            statistics=statistics, constraints=constraints
+            statistics=statistics, constraints=constraints, sagemaker_session=self.sagemaker_session
         )
 
         constraints_s3_uri = None
@@ -1386,7 +1393,7 @@ class DefaultModelMonitor(ModelMonitor):
         )
 
         statistics_object, constraints_object = self._get_baseline_files(
-            statistics=statistics, constraints=constraints
+            statistics=statistics, constraints=constraints, sagemaker_session=self.sagemaker_session
         )
 
         statistics_s3_uri = None
@@ -1761,7 +1768,7 @@ class DefaultModelMonitor(ModelMonitor):
 class BaseliningJob(ProcessingJob):
     """Provides functionality to retrieve baseline-specific files output from baselining job."""
 
-    def __init__(self, sagemaker_session, job_name, inputs, outputs):
+    def __init__(self, sagemaker_session, job_name, inputs, outputs, output_kms_key=None):
         """Initializes a Baselining job that tracks a baselining job kicked off by the suggest
         workflow.
 
@@ -1773,12 +1780,18 @@ class BaseliningJob(ProcessingJob):
             job_name (str): Name of the Amazon SageMaker Model Monitoring Baselining Job.
             inputs ([sagemaker.processing.ProcessingInput]): A list of ProcessingInput objects.
             outputs ([sagemaker.processing.ProcessingOutput]): A list of ProcessingOutput objects.
+            output_kms_key (str): The output kms key associated with the job. Defaults to None
+                if not provided.
 
         """
         self.inputs = inputs
         self.outputs = outputs
         super(BaseliningJob, self).__init__(
-            sagemaker_session=sagemaker_session, job_name=job_name, inputs=inputs, outputs=outputs
+            sagemaker_session=sagemaker_session,
+            job_name=job_name,
+            inputs=inputs,
+            outputs=outputs,
+            output_kms_key=output_kms_key,
         )
 
     @classmethod
@@ -1799,6 +1812,7 @@ class BaseliningJob(ProcessingJob):
             processing_job.job_name,
             processing_job.inputs,
             processing_job.outputs,
+            processing_job.output_kms_key,
         )
 
     def baseline_statistics(self, file_name=STATISTICS_JSON_DEFAULT_FILE_NAME, kms_key=None):
@@ -1822,6 +1836,7 @@ class BaseliningJob(ProcessingJob):
             return Statistics.from_s3_uri(
                 statistics_file_s3_uri=os.path.join(baselining_job_output_s3_path, file_name),
                 kms_key=kms_key,
+                sagemaker_session=self.sagemaker_session,
             )
         except ClientError as client_error:
             if client_error.response["Error"]["Code"] == "NoSuchKey":
@@ -1859,6 +1874,7 @@ class BaseliningJob(ProcessingJob):
             return Constraints.from_s3_uri(
                 constraints_file_s3_uri=os.path.join(baselining_job_output_s3_path, file_name),
                 kms_key=kms_key,
+                sagemaker_session=self.sagemaker_session,
             )
         except ClientError as client_error:
             if client_error.response["Error"]["Code"] == "NoSuchKey":
@@ -1881,7 +1897,7 @@ class MonitoringExecution(ProcessingJob):
     executions
     """
 
-    def __init__(self, sagemaker_session, job_name, inputs, output, output_kms_key):
+    def __init__(self, sagemaker_session, job_name, inputs, output, output_kms_key=None):
         """Initializes a MonitoringExecution job that tracks a monitoring execution kicked off by
         an Amazon SageMaker Model Monitoring Schedule.
 
@@ -1893,13 +1909,17 @@ class MonitoringExecution(ProcessingJob):
             job_name (str): The name of the monitoring execution job.
             output (sagemaker.Processing.ProcessingOutput): The output associated with the
                 monitoring execution.
-            output_kms_key (str): The output kms key associated with the job.
+            output_kms_key (str): The output kms key associated with the job. Defaults to None
+                if not provided.
 
         """
         self.output = output
-        self.output_kms_key = output_kms_key
         super(MonitoringExecution, self).__init__(
-            sagemaker_session=sagemaker_session, job_name=job_name, inputs=inputs, outputs=[output]
+            sagemaker_session=sagemaker_session,
+            job_name=job_name,
+            inputs=inputs,
+            outputs=[output],
+            output_kms_key=output_kms_key,
         )
 
     @classmethod
@@ -1970,6 +1990,7 @@ class MonitoringExecution(ProcessingJob):
             return Statistics.from_s3_uri(
                 statistics_file_s3_uri=os.path.join(baselining_job_output_s3_path, file_name),
                 kms_key=kms_key,
+                sagemaker_session=self.sagemaker_session,
             )
         except ClientError as client_error:
             if client_error.response["Error"]["Code"] == "NoSuchKey":
@@ -2011,6 +2032,7 @@ class MonitoringExecution(ProcessingJob):
                     baselining_job_output_s3_path, file_name
                 ),
                 kms_key=kms_key,
+                sagemaker_session=self.sagemaker_session,
             )
         except ClientError as client_error:
             if client_error.response["Error"]["Code"] == "NoSuchKey":

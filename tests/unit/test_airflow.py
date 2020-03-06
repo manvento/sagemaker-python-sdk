@@ -1,4 +1,4 @@
-# Copyright 2017-2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# Copyright 2017-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"). You
 # may not use this file except in compliance with the License. A copy of
@@ -173,7 +173,11 @@ def test_byo_training_config_all_args(sagemaker_session):
         ]
     ),
 )
-def test_framework_training_config_required_args(sagemaker_session):
+@patch(
+    "sagemaker.fw_utils.get_ecr_image_uri_prefix",
+    return_value="520713654638.dkr.ecr.us-west-2.amazonaws.com",
+)
+def test_framework_training_config_required_args(ecr_prefix, sagemaker_session):
     tf = tensorflow.TensorFlow(
         entry_point="/some/script.py",
         framework_version="1.10.0",
@@ -248,7 +252,11 @@ def test_framework_training_config_required_args(sagemaker_session):
     "sagemaker.estimator.parse_s3_url",
     MagicMock(return_value=["{{ output_path }}", "{{ output_path }}"]),
 )
-def test_framework_training_config_all_args(sagemaker_session):
+@patch(
+    "sagemaker.fw_utils.get_ecr_image_uri_prefix",
+    return_value="520713654638.dkr.ecr.us-west-2.amazonaws.com",
+)
+def test_framework_training_config_all_args(ecr_prefix, sagemaker_session):
     tf = tensorflow.TensorFlow(
         entry_point="{{ entry_point }}",
         source_dir="{{ source_dir }}",
@@ -478,7 +486,11 @@ def test_amazon_alg_training_config_all_args(sagemaker_session):
         ]
     ),
 )
-def test_framework_tuning_config(sagemaker_session):
+@patch(
+    "sagemaker.fw_utils.get_ecr_image_uri_prefix",
+    return_value="520713654638.dkr.ecr.us-west-2.amazonaws.com",
+)
+def test_framework_tuning_config(ecr_prefix, sagemaker_session):
     mxnet_estimator = mxnet.MXNet(
         entry_point="{{ entry_point }}",
         source_dir="{{ source_dir }}",
@@ -617,7 +629,15 @@ def test_framework_tuning_config(sagemaker_session):
         ]
     ),
 )
-def test_multi_estimator_tuning_config(sagemaker_session):
+@patch(
+    "sagemaker.fw_utils.get_ecr_image_uri_prefix",
+    return_value="520713654638.dkr.ecr.us-west-2.amazonaws.com",
+)
+@patch(
+    "sagemaker.amazon.amazon_estimator.get_ecr_image_uri_prefix",
+    return_value="174872318107.dkr.ecr.us-west-2.amazonaws.com",
+)
+def test_multi_estimator_tuning_config(algo_ecr_prefix, fw_ecr_prefix, sagemaker_session):
     estimator_dict = {}
     hyperparameter_ranges_dict = {}
     objective_metric_name_dict = {}
@@ -1025,12 +1045,16 @@ def test_amazon_alg_model_config(sagemaker_session):
         ]
     ),
 )
-def test_model_config_from_framework_estimator(sagemaker_session):
+@patch(
+    "sagemaker.fw_utils.get_ecr_image_uri_prefix",
+    return_value="763104351884.dkr.ecr.us-west-2.amazonaws.com",
+)
+def test_model_config_from_framework_estimator(ecr_prefix, sagemaker_session):
     mxnet_estimator = mxnet.MXNet(
         entry_point="{{ entry_point }}",
         source_dir="{{ source_dir }}",
         py_version="py3",
-        framework_version="1.3.0",
+        framework_version="1.6.0",
         role="{{ role }}",
         train_instance_count=1,
         train_instance_type="ml.m4.xlarge",
@@ -1051,9 +1075,9 @@ def test_model_config_from_framework_estimator(sagemaker_session):
         task_type="training",
     )
     expected_config = {
-        "ModelName": "sagemaker-mxnet-%s" % TIME_STAMP,
+        "ModelName": "mxnet-inference-%s" % TIME_STAMP,
         "PrimaryContainer": {
-            "Image": "520713654638.dkr.ecr.us-west-2.amazonaws.com/sagemaker-mxnet:1.3.0-cpu-py3",
+            "Image": "763104351884.dkr.ecr.us-west-2.amazonaws.com/mxnet-inference:1.6.0-cpu-py3",
             "Environment": {
                 "SAGEMAKER_PROGRAM": "{{ entry_point }}",
                 "SAGEMAKER_SUBMIT_DIRECTORY": "s3://output/{{ ti.xcom_pull(task_ids='task_id')['Training']"
@@ -1179,12 +1203,16 @@ def test_transform_config(sagemaker_session):
         ]
     ),
 )
-def test_transform_config_from_framework_estimator(sagemaker_session):
+@patch(
+    "sagemaker.fw_utils.get_ecr_image_uri_prefix",
+    return_value="763104351884.dkr.ecr.us-west-2.amazonaws.com",
+)
+def test_transform_config_from_framework_estimator(ecr_prefix, sagemaker_session):
     mxnet_estimator = mxnet.MXNet(
         entry_point="{{ entry_point }}",
         source_dir="{{ source_dir }}",
         py_version="py3",
-        framework_version="1.3.0",
+        framework_version="1.6.0",
         role="{{ role }}",
         train_instance_count=1,
         train_instance_type="ml.m4.xlarge",
@@ -1209,9 +1237,9 @@ def test_transform_config_from_framework_estimator(sagemaker_session):
     )
     expected_config = {
         "Model": {
-            "ModelName": "sagemaker-mxnet-%s" % TIME_STAMP,
+            "ModelName": "mxnet-inference-%s" % TIME_STAMP,
             "PrimaryContainer": {
-                "Image": "520713654638.dkr.ecr.us-west-2.amazonaws.com/sagemaker-mxnet:1.3.0-gpu-py3",
+                "Image": "763104351884.dkr.ecr.us-west-2.amazonaws.com/mxnet-inference:1.6.0-gpu-py3",
                 "Environment": {
                     "SAGEMAKER_PROGRAM": "{{ entry_point }}",
                     "SAGEMAKER_SUBMIT_DIRECTORY": "s3://output/{{ ti.xcom_pull(task_ids='task_id')"
@@ -1228,7 +1256,7 @@ def test_transform_config_from_framework_estimator(sagemaker_session):
         },
         "Transform": {
             "TransformJobName": "{{ base_job_name }}-%s" % TIME_STAMP,
-            "ModelName": "sagemaker-mxnet-%s" % TIME_STAMP,
+            "ModelName": "mxnet-inference-%s" % TIME_STAMP,
             "TransformInput": {
                 "DataSource": {
                     "S3DataSource": {"S3DataType": "S3Prefix", "S3Uri": "{{ transform_data }}"}
@@ -1420,12 +1448,16 @@ def test_deploy_amazon_alg_model_config(sagemaker_session):
         ]
     ),
 )
-def test_deploy_config_from_framework_estimator(sagemaker_session):
+@patch(
+    "sagemaker.fw_utils.get_ecr_image_uri_prefix",
+    return_value="763104351884.dkr.ecr.us-west-2.amazonaws.com",
+)
+def test_deploy_config_from_framework_estimator(ecr_prefix, sagemaker_session):
     mxnet_estimator = mxnet.MXNet(
         entry_point="{{ entry_point }}",
         source_dir="{{ source_dir }}",
         py_version="py3",
-        framework_version="1.3.0",
+        framework_version="1.6.0",
         role="{{ role }}",
         train_instance_count=1,
         train_instance_type="ml.m4.xlarge",
@@ -1449,9 +1481,9 @@ def test_deploy_config_from_framework_estimator(sagemaker_session):
     )
     expected_config = {
         "Model": {
-            "ModelName": "sagemaker-mxnet-%s" % TIME_STAMP,
+            "ModelName": "mxnet-inference-%s" % TIME_STAMP,
             "PrimaryContainer": {
-                "Image": "520713654638.dkr.ecr.us-west-2.amazonaws.com/sagemaker-mxnet:1.3.0-cpu-py3",
+                "Image": "763104351884.dkr.ecr.us-west-2.amazonaws.com/mxnet-inference:1.6.0-cpu-py3",
                 "Environment": {
                     "SAGEMAKER_PROGRAM": "{{ entry_point }}",
                     "SAGEMAKER_SUBMIT_DIRECTORY": "s3://output/{{ ti.xcom_pull(task_ids='task_id')['Training']"
@@ -1466,12 +1498,12 @@ def test_deploy_config_from_framework_estimator(sagemaker_session):
             "ExecutionRoleArn": "{{ role }}",
         },
         "EndpointConfig": {
-            "EndpointConfigName": "sagemaker-mxnet-%s" % TIME_STAMP,
+            "EndpointConfigName": "mxnet-inference-%s" % TIME_STAMP,
             "ProductionVariants": [
                 {
                     "InstanceType": "ml.c4.large",
                     "InitialInstanceCount": "{{ instance_count}}",
-                    "ModelName": "sagemaker-mxnet-%s" % TIME_STAMP,
+                    "ModelName": "mxnet-inference-%s" % TIME_STAMP,
                     "VariantName": "AllTraffic",
                     "InitialVariantWeight": 1,
                 }
@@ -1479,7 +1511,7 @@ def test_deploy_config_from_framework_estimator(sagemaker_session):
         },
         "Endpoint": {
             "EndpointName": "mxnet-endpoint",
-            "EndpointConfigName": "sagemaker-mxnet-%s" % TIME_STAMP,
+            "EndpointConfigName": "mxnet-inference-%s" % TIME_STAMP,
         },
     }
 

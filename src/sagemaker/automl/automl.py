@@ -1,4 +1,4 @@
-# Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"). You
 # may not use this file except in compliance with the License. A copy of
@@ -201,6 +201,7 @@ class AutoML(object):
         vpc_config=None,
         enable_network_isolation=False,
         model_kms_key=None,
+        predictor_cls=None,
     ):
         """Deploy a candidate to a SageMaker Inference Pipeline and return a Predictor
 
@@ -215,8 +216,7 @@ class AutoML(object):
                 created from it.
             sagemaker_session (sagemaker.session.Session): A SageMaker Session
                 object, used for SageMaker interactions (default: None). If not
-                specified, one is created using the default AWS configuration
-                chain.
+                specified, the one originally associated with the ``AutoML`` instance is used.
             name (str): The pipeline model name. If None, a default model name will
                 be selected on each ``deploy``.
             endpoint_name (str): The name of the endpoint to create (default:
@@ -237,11 +237,18 @@ class AutoML(object):
                 training cluster for distributed training. Default: False
             model_kms_key (str): KMS key ARN used to encrypt the repacked
                 model archive file if the model is repacked
+            predictor_cls (callable[string, sagemaker.session.Session]): A
+                function to call to create a predictor (default: None). If
+                specified, ``deploy()``  returns the result of invoking this
+                function on the created endpoint name.
 
         Returns:
-            callable[string, sagemaker.session.Session]: Invocation of
-            ``self.predictor_cls`` on the created endpoint name.
+            callable[string, sagemaker.session.Session] or ``None``:
+                If ``predictor_cls`` is specified, the invocation of ``self.predictor_cls`` on
+                the created endpoint name. Otherwise, ``None``.
         """
+        sagemaker_session = sagemaker_session or self.sagemaker_session
+
         if candidate is None:
             candidate_dict = self.best_candidate()
             candidate = CandidateEstimator(candidate_dict, sagemaker_session=sagemaker_session)
@@ -264,6 +271,7 @@ class AutoML(object):
             vpc_config=vpc_config,
             enable_network_isolation=enable_network_isolation,
             model_kms_key=model_kms_key,
+            predictor_cls=predictor_cls,
         )
 
     def _check_problem_type_and_job_objective(self, problem_type, job_objective):
@@ -299,6 +307,7 @@ class AutoML(object):
         vpc_config=None,
         enable_network_isolation=False,
         model_kms_key=None,
+        predictor_cls=None,
     ):
         """Deploy a SageMaker Inference Pipeline.
 
@@ -329,6 +338,10 @@ class AutoML(object):
                 contains "SecurityGroupIds", "Subnets"
             model_kms_key (str): KMS key ARN used to encrypt the repacked
                 model archive file if the model is repacked
+            predictor_cls (callable[string, sagemaker.session.Session]): A
+                function to call to create a predictor (default: None). If
+                specified, ``deploy()``  returns the result of invoking this
+                function on the created endpoint name.
         """
         # construct Model objects
         models = []
@@ -352,6 +365,7 @@ class AutoML(object):
         pipeline = PipelineModel(
             models=models,
             role=self.role,
+            predictor_cls=predictor_cls,
             name=name,
             vpc_config=vpc_config,
             sagemaker_session=sagemaker_session or self.sagemaker_session,
@@ -379,7 +393,7 @@ class AutoML(object):
             if self.base_job_name:
                 base_name = self.base_job_name
             else:
-                base_name = "sagemaker-auto-ml"
+                base_name = "automl"
             # CreateAutoMLJob API validates that member length less than or equal to 32
             self.current_job_name = name_from_base(base_name, max_length=32)
 

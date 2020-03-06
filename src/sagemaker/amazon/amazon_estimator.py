@@ -1,4 +1,4 @@
-# Copyright 2017-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# Copyright 2017-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"). You
 # may not use this file except in compliance with the License. A copy of
@@ -44,29 +44,43 @@ class AmazonAlgorithmEstimatorBase(EstimatorBase):
     repo_version = None
 
     def __init__(
-        self, role, train_instance_count, train_instance_type, data_location=None, **kwargs
+        self,
+        role,
+        train_instance_count,
+        train_instance_type,
+        data_location=None,
+        enable_network_isolation=False,
+        **kwargs
     ):
         """Initialize an AmazonAlgorithmEstimatorBase.
 
         Args:
-            role:
-            train_instance_count:
-            train_instance_type:
+            role (str): An AWS IAM role (either name or full ARN). The Amazon
+                SageMaker training jobs and APIs that create Amazon SageMaker
+                endpoints use this role to access training data and model
+                artifacts. After the endpoint is created, the inference code
+                might use the IAM role, if it needs to access an AWS resource.
+            train_instance_count (int): Number of Amazon EC2 instances to use
+                for training.
+            train_instance_type (str): Type of EC2 instance to use for training,
+                for example, 'ml.c4.xlarge'.
             data_location (str or None): The s3 prefix to upload RecordSet
                 objects to, expressed as an S3 url. For example
                 "s3://example-bucket/some-key-prefix/". Objects will be saved in
                 a unique sub-directory of the specified location. If None, a
                 default data location will be used.
-            **kwargs:
+            enable_network_isolation (bool): Specifies whether container will
+                run in network isolation mode. Network isolation mode restricts
+                the container access to outside networks (such as the internet).
+                Also known as internet-free mode (default: ``False``).
+            **kwargs: Additional parameters passed to
+                :class:`~sagemaker.estimator.EstimatorBase`.
+
+        .. tip::
+
+            You can find additional parameters for initializing this class at
+            :class:`~sagemaker.estimator.EstimatorBase`.
         """
-
-        if "enable_network_isolation" in kwargs:
-            logger.debug(
-                "removing unused enable_network_isolation argument: %s",
-                str(kwargs["enable_network_isolation"]),
-            )
-            del kwargs["enable_network_isolation"]
-
         super(AmazonAlgorithmEstimatorBase, self).__init__(
             role, train_instance_count, train_instance_type, **kwargs
         )
@@ -75,6 +89,7 @@ class AmazonAlgorithmEstimatorBase(EstimatorBase):
             self.sagemaker_session.default_bucket()
         )
         self._data_location = data_location
+        self._enable_network_isolation = enable_network_isolation
 
     def train_image(self):
         """Placeholder docstring"""
@@ -85,6 +100,14 @@ class AmazonAlgorithmEstimatorBase(EstimatorBase):
     def hyperparameters(self):
         """Placeholder docstring"""
         return hp.serialize_all(self)
+
+    def enable_network_isolation(self):
+        """If this Estimator can use network isolation when running.
+
+        Returns:
+            bool: Whether this Estimator can use network isolation or not.
+        """
+        return self._enable_network_isolation
 
     @property
     def data_location(self):

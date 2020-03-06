@@ -1,4 +1,4 @@
-# Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"). You
 # may not use this file except in compliance with the License. A copy of
@@ -25,6 +25,8 @@ from sagemaker.processing import ScriptProcessor
 
 class SKLearnProcessor(ScriptProcessor):
     """Handles Amazon SageMaker processing tasks for jobs using scikit-learn."""
+
+    _valid_framework_versions = ["0.20.0"]
 
     def __init__(
         self,
@@ -83,6 +85,13 @@ class SKLearnProcessor(ScriptProcessor):
         """
         session = sagemaker_session or Session()
         region = session.boto_region_name
+
+        if framework_version not in self._valid_framework_versions:
+            raise ValueError(
+                "scikit-learn version {} is not supported. Supported versions are {}".format(
+                    framework_version, self._valid_framework_versions
+                )
+            )
 
         if not command:
             command = ["python3"]

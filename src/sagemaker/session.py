@@ -1,4 +1,4 @@
-# Copyright 2017-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# Copyright 2017-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"). You
 # may not use this file except in compliance with the License. A copy of
@@ -21,10 +21,10 @@ import sys
 import time
 import warnings
 
-import six
 import boto3
 import botocore.config
 from botocore.exceptions import ClientError
+import six
 
 import sagemaker.logs
 from sagemaker import vpc_utils
@@ -76,7 +76,13 @@ class Session(object):  # pylint: disable=too-many-public-methods
     bucket based on a naming convention which includes the current AWS account ID.
     """
 
-    def __init__(self, boto_session=None, sagemaker_client=None, sagemaker_runtime_client=None):
+    def __init__(
+        self,
+        boto_session=None,
+        sagemaker_client=None,
+        sagemaker_runtime_client=None,
+        default_bucket=None,
+    ):
         """Initialize a SageMaker ``Session``.
 
         Args:
@@ -91,13 +97,25 @@ class Session(object):  # pylint: disable=too-many-public-methods
                 ``InvokeEndpoint`` calls to Amazon SageMaker (default: None). Predictors created
                 using this ``Session`` use this client. If not provided, one will be created using
                 this instance's ``boto_session``.
+            default_bucket (str): The default Amazon S3 bucket to be used by this session.
+                This will be created the next time an Amazon S3 bucket is needed (by calling
+                :func:`default_bucket`).
+                If not provided, a default bucket will be created based on the following format:
+                "sagemaker-{region}-{aws-account-id}".
+                Example: "sagemaker-my-custom-bucket".
+
         """
         self._default_bucket = None
+        self._default_bucket_name_override = default_bucket
 
         # currently is used for local_code in local mode
         self.config = None
 
-        self._initialize(boto_session, sagemaker_client, sagemaker_runtime_client)
+        self._initialize(
+            boto_session=boto_session,
+            sagemaker_client=sagemaker_client,
+            sagemaker_runtime_client=sagemaker_runtime_client,
+        )
 
     def _initialize(self, boto_session, sagemaker_client, sagemaker_runtime_client):
         """Initialize this SageMaker Session.
@@ -206,10 +224,8 @@ class Session(object):  # pylint: disable=too-many-public-methods
             kms_key (str): The KMS key to use for encrypting the file.
 
         Returns:
-            str: The S3 URI of the uploaded file(s). If a file is specified in the path argument,
-                the URI format is: ``s3://{bucket name}/{key_prefix}/{original_file_name}``.
-                If a directory is specified in the path argument, the URI format is
-                ``s3://{bucket name}/{key_prefix}``.
+            str: The S3 URI of the uploaded file.
+                The URI format is: ``s3://{bucket name}/{key}``.
         """
         s3 = self.boto_session.resource("s3")
         s3_object = s3.Object(bucket_name=bucket, key=key)
@@ -218,6 +234,9 @@ class Session(object):  # pylint: disable=too-many-public-methods
             s3_object.put(Body=body, SSEKMSKeyId=kms_key, ServerSideEncryption="aws:kms")
         else:
             s3_object.put(Body=body)
+
+        s3_uri = "s3://{}/{}".format(bucket, key)
+        return s3_uri
 
     def download_data(self, path, bucket, key_prefix="", extra_args=None):
         """Download file or directory from S3.
@@ -315,44 +334,65 @@ class Session(object):  # pylint: disable=too-many-public-methods
             return self._default_bucket
 
         region = self.boto_session.region_name
-        account = self.boto_session.client(
-            "sts", region_name=region, endpoint_url=sts_regional_endpoint(region)
-        ).get_caller_identity()["Account"]
-        default_bucket = "sagemaker-{}-{}".format(region, account)
 
-        s3 = self.boto_session.resource("s3")
-        try:
-            # 'us-east-1' cannot be specified because it is the default region:
-            # https://github.com/boto/boto3/issues/125
-            if region == "us-east-1":
-                s3.create_bucket(Bucket=default_bucket)
-            else:
-                s3.create_bucket(
-                    Bucket=default_bucket, CreateBucketConfiguration={"LocationConstraint": region}
-                )
+        default_bucket = self._default_bucket_name_override
+        if not default_bucket:
+            account = self.boto_session.client(
+                "sts", region_name=region, endpoint_url=sts_regional_endpoint(region)
+            ).get_caller_identity()["Account"]
+            default_bucket = "sagemaker-{}-{}".format(region, account)
 
-            LOGGER.info("Created S3 bucket: %s", default_bucket)
-        except ClientError as e:
-            error_code = e.response["Error"]["Code"]
-            message = e.response["Error"]["Message"]
-
-            if error_code == "BucketAlreadyOwnedByYou":
-                pass
-            elif (
-                error_code == "OperationAborted" and "conflicting conditional operation" in message
-            ):
-                # If this bucket is already being concurrently created, we don't need to create it
-                # again.
-                pass
-            elif error_code == "TooManyBuckets":
-                # Succeed if the default bucket exists
-                s3.meta.client.head_bucket(Bucket=default_bucket)
-            else:
-                raise
+        self._create_s3_bucket_if_it_does_not_exist(bucket_name=default_bucket, region=region)
 
         self._default_bucket = default_bucket
 
         return self._default_bucket
+
+    def _create_s3_bucket_if_it_does_not_exist(self, bucket_name, region):
+        """Creates an S3 Bucket if it does not exist.
+        Also swallows a few common exceptions that indicate that the bucket already exists or
+        that it is being created.
+
+        Args:
+            bucket_name (str): Name of the S3 bucket to be created.
+            region (str): The region in which to create the bucket.
+
+        Raises:
+            botocore.exceptions.ClientError: If S3 throws an unexpected exception during bucket
+                creation.
+                If the exception is due to the bucket already existing or
+                already being created, no exception is raised.
+
+        """
+        bucket = self.boto_session.resource("s3", region_name=region).Bucket(name=bucket_name)
+        if bucket.creation_date is None:
+            try:
+                s3 = self.boto_session.resource("s3", region_name=region)
+                if region == "us-east-1":
+                    # 'us-east-1' cannot be specified because it is the default region:
+                    # https://github.com/boto/boto3/issues/125
+                    s3.create_bucket(Bucket=bucket_name)
+                else:
+                    s3.create_bucket(
+                        Bucket=bucket_name, CreateBucketConfiguration={"LocationConstraint": region}
+                    )
+
+                LOGGER.info("Created S3 bucket: %s", bucket_name)
+            except ClientError as e:
+                error_code = e.response["Error"]["Code"]
+                message = e.response["Error"]["Message"]
+
+                if error_code == "BucketAlreadyOwnedByYou":
+                    pass
+                elif (
+                    error_code == "OperationAborted"
+                    and "conflicting conditional operation" in message
+                ):
+                    # If this bucket is already being concurrently created, we don't need to create
+                    # it again.
+                    pass
+                else:
+                    raise
 
     def train(  # noqa: C901
         self,
@@ -2341,8 +2381,8 @@ class Session(object):  # pylint: disable=too-many-public-methods
             self.wait_for_endpoint(endpoint_name)
         return endpoint_name
 
-    def update_endpoint(self, endpoint_name, endpoint_config_name):
-        """ Update an Amazon SageMaker ``Endpoint`` according to the endpoint configuration
+    def update_endpoint(self, endpoint_name, endpoint_config_name, wait=True):
+        """Update an Amazon SageMaker ``Endpoint`` according to the endpoint configuration
         specified in the request
 
         Raise an error if endpoint with endpoint_name does not exist.
@@ -2351,10 +2391,14 @@ class Session(object):  # pylint: disable=too-many-public-methods
             endpoint_name (str): Name of the Amazon SageMaker ``Endpoint`` to update.
             endpoint_config_name (str): Name of the Amazon SageMaker endpoint configuration to
                 deploy.
+            wait (bool): Whether to wait for the endpoint deployment to complete before returning
+                (default: True).
 
         Returns:
             str: Name of the Amazon SageMaker ``Endpoint`` being updated.
 
+        Raises:
+            ValueError: if the endpoint does not already exist
         """
         if not _deployment_entity_exists(
             lambda: self.sagemaker_client.describe_endpoint(EndpointName=endpoint_name)
@@ -2367,6 +2411,9 @@ class Session(object):  # pylint: disable=too-many-public-methods
         self.sagemaker_client.update_endpoint(
             EndpointName=endpoint_name, EndpointConfigName=endpoint_config_name
         )
+
+        if wait:
+            self.wait_for_endpoint(endpoint_name)
         return endpoint_name
 
     def delete_endpoint(self, endpoint_name):
@@ -2568,7 +2615,7 @@ class Session(object):  # pylint: disable=too-many-public-methods
                 actual_status=status,
             )
 
-    def wait_for_endpoint(self, endpoint, poll=5):
+    def wait_for_endpoint(self, endpoint, poll=30):
         """Wait for an Amazon SageMaker endpoint deployment to complete.
 
         Args:
@@ -2832,7 +2879,7 @@ class Session(object):  # pylint: disable=too-many-public-methods
                 )
                 return instance_desc["RoleArn"]
             except ClientError:
-                LOGGER.warning(
+                LOGGER.debug(
                     "Couldn't call 'describe_notebook_instance' to get the Role "
                     "ARN of the instance %s.",
                     instance_name,
@@ -3146,7 +3193,7 @@ class Session(object):  # pylint: disable=too-many-public-methods
                 print()
 
 
-def container_def(image, model_data_url=None, env=None):
+def container_def(image, model_data_url=None, env=None, container_mode=None):
     """Create a definition for executing a container as part of a SageMaker model.
 
     Args:
@@ -3154,6 +3201,10 @@ def container_def(image, model_data_url=None, env=None):
         model_data_url (str): S3 URI of data required by this container,
             e.g. SageMaker training job model artifacts (default: None).
         env (dict[str, str]): Environment variables to set inside the container (default: None).
+        container_mode (str): The model container mode. Valid modes:
+                * MultiModel: Indicates that model container can support hosting multiple models
+                * SingleModel: Indicates that model container can support hosting a single model
+                This is the default model container mode when container_mode = None
     Returns:
         dict[str, str]: A complete container definition object usable with the CreateModel API if
         passed via `PrimaryContainers` field.
@@ -3163,6 +3214,8 @@ def container_def(image, model_data_url=None, env=None):
     c_def = {"Image": image, "Environment": env}
     if model_data_url:
         c_def["ModelDataUrl"] = model_data_url
+    if container_mode:
+        c_def["Mode"] = container_mode
     return c_def
 
 

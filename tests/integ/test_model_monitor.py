@@ -1,4 +1,4 @@
-# Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"). You
 # may not use this file except in compliance with the License. A copy of
@@ -14,9 +14,9 @@ from __future__ import absolute_import
 
 import json
 import os
+import uuid
 
 import pytest
-import uuid
 
 import tests.integ
 import tests.integ.timeout
@@ -107,7 +107,7 @@ def predictor(sagemaker_session, tf_full_version):
             INSTANCE_COUNT,
             INSTANCE_TYPE,
             endpoint_name=endpoint_name,
-            data_capture_config=DataCaptureConfig(True),
+            data_capture_config=DataCaptureConfig(True, sagemaker_session=sagemaker_session),
         )
         yield predictor
 
@@ -136,11 +136,13 @@ def default_monitoring_schedule_name(sagemaker_session, output_kms_key, volume_k
     )
 
     statistics = Statistics.from_file_path(
-        statistics_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/statistics.json")
+        statistics_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/statistics.json"),
+        sagemaker_session=sagemaker_session,
     )
 
     constraints = Constraints.from_file_path(
-        constraints_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/constraints.json")
+        constraints_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/constraints.json"),
+        sagemaker_session=sagemaker_session,
     )
 
     my_default_monitor.create_monitoring_schedule(
@@ -194,11 +196,13 @@ def byoc_monitoring_schedule_name(sagemaker_session, output_kms_key, volume_kms_
     )
 
     statistics = Statistics.from_file_path(
-        statistics_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/statistics.json")
+        statistics_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/statistics.json"),
+        sagemaker_session=sagemaker_session,
     )
 
     constraints = Constraints.from_file_path(
-        constraints_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/constraints.json")
+        constraints_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/constraints.json"),
+        sagemaker_session=sagemaker_session,
     )
 
     my_byoc_monitor.create_monitoring_schedule(
@@ -266,6 +270,11 @@ def updated_output_kms_key(sagemaker_session):
     )
 
 
+@pytest.mark.skipif(
+    tests.integ.test_region() in tests.integ.NO_MODEL_MONITORING_REGIONS,
+    reason="ModelMonitoring is not yet supported in this region.",
+)
+@pytest.mark.canary_quick
 def test_default_monitor_suggest_baseline_and_create_monitoring_schedule_with_customizations(
     sagemaker_session, output_kms_key, volume_kms_key, predictor
 ):
@@ -464,6 +473,10 @@ def test_default_monitor_suggest_baseline_and_create_monitoring_schedule_with_cu
     assert len(summary["MonitoringScheduleSummaries"]) > 0
 
 
+@pytest.mark.skipif(
+    tests.integ.test_region() in tests.integ.NO_MODEL_MONITORING_REGIONS,
+    reason="ModelMonitoring is not yet supported in this region.",
+)
 def test_default_monitor_suggest_baseline_and_create_monitoring_schedule_without_customizations(
     sagemaker_session, predictor
 ):
@@ -637,6 +650,10 @@ def test_default_monitor_suggest_baseline_and_create_monitoring_schedule_without
     assert len(summary["MonitoringScheduleSummaries"]) > 0
 
 
+@pytest.mark.skipif(
+    tests.integ.test_region() in tests.integ.NO_MODEL_MONITORING_REGIONS,
+    reason="ModelMonitoring is not yet supported in this region.",
+)
 def test_default_monitor_create_stop_and_start_monitoring_schedule_with_customizations(
     sagemaker_session, output_kms_key, volume_kms_key, predictor
 ):
@@ -663,11 +680,13 @@ def test_default_monitor_create_stop_and_start_monitoring_schedule_with_customiz
     )
 
     statistics = Statistics.from_file_path(
-        statistics_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/statistics.json")
+        statistics_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/statistics.json"),
+        sagemaker_session=sagemaker_session,
     )
 
     constraints = Constraints.from_file_path(
-        constraints_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/constraints.json")
+        constraints_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/constraints.json"),
+        sagemaker_session=sagemaker_session,
     )
 
     my_default_monitor.create_monitoring_schedule(
@@ -792,7 +811,15 @@ def test_default_monitor_create_stop_and_start_monitoring_schedule_with_customiz
     started_schedule_description = my_default_monitor.describe_schedule()
     assert started_schedule_description["MonitoringScheduleStatus"] == "Scheduled"
 
+    my_default_monitor.stop_monitoring_schedule()
 
+    _wait_for_schedule_changes_to_apply(monitor=my_default_monitor)
+
+
+@pytest.mark.skipif(
+    tests.integ.test_region() in tests.integ.NO_MODEL_MONITORING_REGIONS,
+    reason="ModelMonitoring is not yet supported in this region.",
+)
 def test_default_monitor_create_and_update_schedule_config_with_customizations(
     sagemaker_session,
     predictor,
@@ -823,11 +850,13 @@ def test_default_monitor_create_and_update_schedule_config_with_customizations(
     )
 
     statistics = Statistics.from_file_path(
-        statistics_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/statistics.json")
+        statistics_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/statistics.json"),
+        sagemaker_session=sagemaker_session,
     )
 
     constraints = Constraints.from_file_path(
-        constraints_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/constraints.json")
+        constraints_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/constraints.json"),
+        sagemaker_session=sagemaker_session,
     )
 
     my_default_monitor.create_monitoring_schedule(
@@ -937,11 +966,13 @@ def test_default_monitor_create_and_update_schedule_config_with_customizations(
     )
 
     statistics = Statistics.from_file_path(
-        statistics_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/statistics.json")
+        statistics_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/statistics.json"),
+        sagemaker_session=sagemaker_session,
     )
 
     constraints = Constraints.from_file_path(
-        constraints_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/constraints.json")
+        constraints_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/constraints.json"),
+        sagemaker_session=sagemaker_session,
     )
 
     _wait_for_schedule_changes_to_apply(monitor=my_default_monitor)
@@ -1061,9 +1092,20 @@ def test_default_monitor_create_and_update_schedule_config_with_customizations(
         ]["EnableNetworkIsolation"]
         == UPDATED_NETWORK_CONFIG.enable_network_isolation
     )
+
+    _wait_for_schedule_changes_to_apply(monitor=my_default_monitor)
+
+    my_default_monitor.stop_monitoring_schedule()
+
+    _wait_for_schedule_changes_to_apply(monitor=my_default_monitor)
+
     assert len(predictor.list_monitors()) > 0
 
 
+@pytest.mark.skipif(
+    tests.integ.test_region() in tests.integ.NO_MODEL_MONITORING_REGIONS,
+    reason="ModelMonitoring is not yet supported in this region.",
+)
 def test_default_monitor_create_and_update_schedule_config_without_customizations(
     sagemaker_session, predictor
 ):
@@ -1277,7 +1319,17 @@ def test_default_monitor_create_and_update_schedule_config_without_customization
         is None
     )
 
+    _wait_for_schedule_changes_to_apply(monitor=my_default_monitor)
 
+    my_default_monitor.stop_monitoring_schedule()
+
+    _wait_for_schedule_changes_to_apply(monitor=my_default_monitor)
+
+
+@pytest.mark.skipif(
+    tests.integ.test_region() in tests.integ.NO_MODEL_MONITORING_REGIONS,
+    reason="ModelMonitoring is not yet supported in this region.",
+)
 def test_default_monitor_attach_followed_by_baseline_and_update_monitoring_schedule(
     sagemaker_session,
     default_monitoring_schedule_name,
@@ -1296,11 +1348,13 @@ def test_default_monitor_attach_followed_by_baseline_and_update_monitoring_sched
     )
 
     statistics = Statistics.from_file_path(
-        statistics_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/statistics.json")
+        statistics_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/statistics.json"),
+        sagemaker_session=sagemaker_session,
     )
 
     constraints = Constraints.from_file_path(
-        constraints_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/constraints.json")
+        constraints_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/constraints.json"),
+        sagemaker_session=sagemaker_session,
     )
 
     _wait_for_schedule_changes_to_apply(my_attached_monitor)
@@ -1421,11 +1475,20 @@ def test_default_monitor_attach_followed_by_baseline_and_update_monitoring_sched
         == UPDATED_NETWORK_CONFIG.enable_network_isolation
     )
 
+    _wait_for_schedule_changes_to_apply(monitor=my_attached_monitor)
 
+    my_attached_monitor.stop_monitoring_schedule()
+
+    _wait_for_schedule_changes_to_apply(monitor=my_attached_monitor)
+
+
+@pytest.mark.skipif(
+    tests.integ.test_region() in tests.integ.NO_MODEL_MONITORING_REGIONS,
+    reason="ModelMonitoring is not yet supported in this region.",
+)
 def test_default_monitor_monitoring_execution_interactions(
     sagemaker_session, default_monitoring_schedule_name
 ):
-
     my_attached_monitor = DefaultModelMonitor.attach(
         monitor_schedule_name=default_monitoring_schedule_name, sagemaker_session=sagemaker_session
     )
@@ -1462,6 +1525,10 @@ def test_default_monitor_monitoring_execution_interactions(
     assert constraint_violations.body_dict["violations"][0]["feature_name"] == "store_and_fwd_flag"
 
 
+@pytest.mark.skipif(
+    tests.integ.test_region() in tests.integ.NO_MODEL_MONITORING_REGIONS,
+    reason="ModelMonitoring is not yet supported in this region.",
+)
 def test_byoc_monitor_suggest_baseline_and_create_monitoring_schedule_with_customizations(
     sagemaker_session, output_kms_key, volume_kms_key, predictor
 ):
@@ -1666,10 +1733,20 @@ def test_byoc_monitor_suggest_baseline_and_create_monitoring_schedule_with_custo
         == NETWORK_CONFIG.enable_network_isolation
     )
 
+    _wait_for_schedule_changes_to_apply(monitor=my_byoc_monitor)
+
+    my_byoc_monitor.stop_monitoring_schedule()
+
+    _wait_for_schedule_changes_to_apply(monitor=my_byoc_monitor)
+
     summary = sagemaker_session.list_monitoring_schedules()
     assert len(summary["MonitoringScheduleSummaries"]) > 0
 
 
+@pytest.mark.skipif(
+    tests.integ.test_region() in tests.integ.NO_MODEL_MONITORING_REGIONS,
+    reason="ModelMonitoring is not yet supported in this region.",
+)
 def test_byoc_monitor_suggest_baseline_and_create_monitoring_schedule_without_customizations(
     sagemaker_session, predictor
 ):
@@ -1850,10 +1927,20 @@ def test_byoc_monitor_suggest_baseline_and_create_monitoring_schedule_without_cu
         is None
     )
 
+    _wait_for_schedule_changes_to_apply(monitor=my_byoc_monitor)
+
+    my_byoc_monitor.stop_monitoring_schedule()
+
+    _wait_for_schedule_changes_to_apply(monitor=my_byoc_monitor)
+
     summary = sagemaker_session.list_monitoring_schedules()
     assert len(summary["MonitoringScheduleSummaries"]) > 0
 
 
+@pytest.mark.skipif(
+    tests.integ.test_region() in tests.integ.NO_MODEL_MONITORING_REGIONS,
+    reason="ModelMonitoring is not yet supported in this region.",
+)
 def test_byoc_monitor_create_and_update_schedule_config_with_customizations(
     sagemaker_session,
     predictor,
@@ -1893,11 +1980,13 @@ def test_byoc_monitor_create_and_update_schedule_config_with_customizations(
     )
 
     statistics = Statistics.from_file_path(
-        statistics_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/statistics.json")
+        statistics_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/statistics.json"),
+        sagemaker_session=sagemaker_session,
     )
 
     constraints = Constraints.from_file_path(
-        constraints_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/constraints.json")
+        constraints_file_path=os.path.join(tests.integ.DATA_DIR, "monitor/constraints.json"),
+        sagemaker_session=sagemaker_session,
     )
 
     my_byoc_monitor.create_monitoring_schedule(
@@ -2123,9 +2212,20 @@ def test_byoc_monitor_create_and_update_schedule_config_with_customizations(
         ]["EnableNetworkIsolation"]
         == UPDATED_NETWORK_CONFIG.enable_network_isolation
     )
+
+    _wait_for_schedule_changes_to_apply(monitor=my_byoc_monitor)
+
+    my_byoc_monitor.stop_monitoring_schedule()
+
+    _wait_for_schedule_changes_to_apply(monitor=my_byoc_monitor)
+
     assert len(predictor.list_monitors()) > 0
 
 
+@pytest.mark.skipif(
+    tests.integ.test_region() in tests.integ.NO_MODEL_MONITORING_REGIONS,
+    reason="ModelMonitoring is not yet supported in this region.",
+)
 def test_byoc_monitor_attach_followed_by_baseline_and_update_monitoring_schedule(
     sagemaker_session,
     predictor,
@@ -2337,7 +2437,17 @@ def test_byoc_monitor_attach_followed_by_baseline_and_update_monitoring_schedule
         == UPDATED_NETWORK_CONFIG.enable_network_isolation
     )
 
+    _wait_for_schedule_changes_to_apply(monitor=my_attached_monitor)
 
+    my_attached_monitor.stop_monitoring_schedule()
+
+    _wait_for_schedule_changes_to_apply(monitor=my_attached_monitor)
+
+
+@pytest.mark.skipif(
+    tests.integ.test_region() in tests.integ.NO_MODEL_MONITORING_REGIONS,
+    reason="ModelMonitoring is not yet supported in this region.",
+)
 def test_byoc_monitor_monitoring_execution_interactions(
     sagemaker_session, byoc_monitoring_schedule_name
 ):

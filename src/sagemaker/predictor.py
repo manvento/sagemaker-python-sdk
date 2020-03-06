@@ -1,4 +1,4 @@
-# Copyright 2017-2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# Copyright 2017-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"). You
 # may not use this file except in compliance with the License. A copy of
@@ -83,7 +83,7 @@ class RealTimePredictor(object):
         self._endpoint_config_name = self._get_endpoint_config_name()
         self._model_names = self._get_model_names()
 
-    def predict(self, data, initial_args=None):
+    def predict(self, data, initial_args=None, target_model=None):
         """Return the inference from the specified endpoint.
 
         Args:
@@ -95,6 +95,9 @@ class RealTimePredictor(object):
             initial_args (dict[str,str]): Optional. Default arguments for boto3
                 ``invoke_endpoint`` call. Default is None (no default
                 arguments).
+            target_model (str): S3 model artifact path to run an inference request on,
+                in case of a multi model endpoint. Does not apply to endpoints hosting
+                single model (Default: None)
 
         Returns:
             object: Inference for the given input. If a deserializer was specified when creating
@@ -103,7 +106,7 @@ class RealTimePredictor(object):
                 as is.
         """
 
-        request_args = self._create_request_args(data, initial_args)
+        request_args = self._create_request_args(data, initial_args, target_model)
         response = self.sagemaker_session.sagemaker_runtime_client.invoke_endpoint(**request_args)
         return self._handle_response(response)
 
@@ -120,11 +123,12 @@ class RealTimePredictor(object):
         response_body.close()
         return data
 
-    def _create_request_args(self, data, initial_args=None):
+    def _create_request_args(self, data, initial_args=None, target_model=None):
         """
         Args:
             data:
             initial_args:
+            target_model:
         """
         args = dict(initial_args) if initial_args else {}
 
@@ -136,6 +140,9 @@ class RealTimePredictor(object):
 
         if self.accept and "Accept" not in args:
             args["Accept"] = self.accept
+
+        if target_model:
+            args["TargetModel"] = target_model
 
         if self.serializer is not None:
             data = self.serializer(data)
@@ -185,14 +192,22 @@ class RealTimePredictor(object):
         to enable data capture. For a more customized experience, refer to
         update_data_capture_config, instead.
         """
-        self.update_data_capture_config(data_capture_config=DataCaptureConfig(enable_capture=True))
+        self.update_data_capture_config(
+            data_capture_config=DataCaptureConfig(
+                enable_capture=True, sagemaker_session=self.sagemaker_session
+            )
+        )
 
     def disable_data_capture(self):
         """Updates the DataCaptureConfig for the Predictor's associated Amazon SageMaker Endpoint
         to disable data capture. For a more customized experience, refer to
         update_data_capture_config, instead.
         """
-        self.update_data_capture_config(data_capture_config=DataCaptureConfig(enable_capture=False))
+        self.update_data_capture_config(
+            data_capture_config=DataCaptureConfig(
+                enable_capture=False, sagemaker_session=self.sagemaker_session
+            )
+        )
 
     def update_data_capture_config(self, data_capture_config):
         """Updates the DataCaptureConfig for the Predictor's associated Amazon SageMaker Endpoint
@@ -227,7 +242,8 @@ class RealTimePredictor(object):
         associated with the endpoint that this predictor refers to.
 
         Returns:
-            [ModelMonitor]: A list of ModelMonitor (or DefaultModelMonitor) objects.
+            [sagemaker.model_monitor.model_monitoring.ModelMonitor]: A list of
+                ModelMonitor (or DefaultModelMonitor) objects.
 
         """
         monitoring_schedules_dict = self.sagemaker_session.list_monitoring_schedules(

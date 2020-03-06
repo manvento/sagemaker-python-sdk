@@ -1,4 +1,4 @@
-# Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"). You
 # may not use this file except in compliance with the License. A copy of
@@ -26,7 +26,6 @@ from tests.integ.timeout import timeout
 
 ROLE = "SageMakerRole"
 PREFIX = "sagemaker/beta-automl-xgboost"
-HOSTING_INSTANCE_TYPE = "ml.c4.xlarge"
 AUTO_ML_INSTANCE_TYPE = "ml.m5.2xlarge"
 INSTANCE_COUNT = 1
 RESOURCE_POOLS = [{"InstanceType": AUTO_ML_INSTANCE_TYPE, "PoolSize": INSTANCE_COUNT}]
@@ -50,6 +49,7 @@ EXPECTED_DEFAULT_JOB_CONFIG = {
     tests.integ.test_region() in tests.integ.NO_AUTO_ML_REGIONS,
     reason="AutoML is not supported in the region yet.",
 )
+@pytest.mark.canary_quick
 def test_auto_ml_fit(sagemaker_session):
     auto_ml = AutoML(
         role=ROLE,
@@ -58,9 +58,10 @@ def test_auto_ml_fit(sagemaker_session):
         max_candidates=3,
     )
 
+    job_name = unique_name_from_base("auto-ml", max_length=32)
     inputs = sagemaker_session.upload_data(path=TRAINING_DATA, key_prefix=PREFIX + "/input")
     with timeout(minutes=AUTO_ML_DEFAULT_TIMEMOUT_MINUTES):
-        auto_ml.fit(inputs)
+        auto_ml.fit(inputs, job_name=job_name)
 
 
 @pytest.mark.skipif(
@@ -76,8 +77,9 @@ def test_auto_ml_fit_local_input(sagemaker_session):
     )
 
     inputs = TRAINING_DATA
+    job_name = unique_name_from_base("auto-ml", max_length=32)
     with timeout(minutes=AUTO_ML_DEFAULT_TIMEMOUT_MINUTES):
-        auto_ml.fit(inputs)
+        auto_ml.fit(inputs, job_name=job_name)
 
 
 @pytest.mark.skipif(
@@ -91,10 +93,11 @@ def test_auto_ml_input_object_fit(sagemaker_session):
         sagemaker_session=sagemaker_session,
         max_candidates=1,
     )
+    job_name = unique_name_from_base("auto-ml", max_length=32)
     s3_input = sagemaker_session.upload_data(path=TRAINING_DATA, key_prefix=PREFIX + "/input")
     inputs = AutoMLInput(inputs=s3_input, target_attribute_name=TARGET_ATTRIBUTE_NAME)
     with timeout(minutes=AUTO_ML_DEFAULT_TIMEMOUT_MINUTES):
-        auto_ml.fit(inputs)
+        auto_ml.fit(inputs, job_name=job_name)
 
 
 @pytest.mark.skipif(
@@ -134,11 +137,12 @@ def test_auto_ml_invalid_target_attribute(sagemaker_session):
     auto_ml = AutoML(
         role=ROLE, target_attribute_name="y", sagemaker_session=sagemaker_session, max_candidates=1
     )
+    job_name = unique_name_from_base("auto-ml", max_length=32)
     inputs = sagemaker_session.upload_data(path=TRAINING_DATA, key_prefix=PREFIX + "/input")
     with pytest.raises(
         UnexpectedStatusException, match="Could not complete the data builder processing job."
     ):
-        auto_ml.fit(inputs)
+        auto_ml.fit(inputs, job_name=job_name)
 
 
 @pytest.mark.skipif(
@@ -212,7 +216,8 @@ def test_best_candidate(sagemaker_session):
     tests.integ.test_region() in tests.integ.NO_AUTO_ML_REGIONS,
     reason="AutoML is not supported in the region yet.",
 )
-def test_deploy_best_candidate(sagemaker_session):
+@pytest.mark.canary_quick
+def test_deploy_best_candidate(sagemaker_session, cpu_instance_type):
     auto_ml_utils.create_auto_ml_job_if_not_exist(sagemaker_session)
 
     auto_ml = AutoML(
@@ -225,7 +230,7 @@ def test_deploy_best_candidate(sagemaker_session):
         auto_ml.deploy(
             candidate=best_candidate,
             initial_instance_count=INSTANCE_COUNT,
-            instance_type=HOSTING_INSTANCE_TYPE,
+            instance_type=cpu_instance_type,
             endpoint_name=endpoint_name,
         )
 
@@ -240,7 +245,7 @@ def test_deploy_best_candidate(sagemaker_session):
     tests.integ.test_region() in tests.integ.NO_AUTO_ML_REGIONS,
     reason="AutoML is not supported in the region yet.",
 )
-def test_candidate_estimator_default_rerun_and_deploy(sagemaker_session):
+def test_candidate_estimator_default_rerun_and_deploy(sagemaker_session, cpu_instance_type):
     auto_ml_utils.create_auto_ml_job_if_not_exist(sagemaker_session)
 
     auto_ml = AutoML(
@@ -257,7 +262,7 @@ def test_candidate_estimator_default_rerun_and_deploy(sagemaker_session):
         candidate_estimator.fit(inputs)
         auto_ml.deploy(
             initial_instance_count=INSTANCE_COUNT,
-            instance_type=HOSTING_INSTANCE_TYPE,
+            instance_type=cpu_instance_type,
             candidate=candidate,
             endpoint_name=endpoint_name,
         )
@@ -273,7 +278,7 @@ def test_candidate_estimator_default_rerun_and_deploy(sagemaker_session):
     tests.integ.test_region() in tests.integ.NO_AUTO_ML_REGIONS,
     reason="AutoML is not supported in the region yet.",
 )
-def test_candidate_estimator_rerun_with_optional_args(sagemaker_session):
+def test_candidate_estimator_rerun_with_optional_args(sagemaker_session, cpu_instance_type):
     auto_ml_utils.create_auto_ml_job_if_not_exist(sagemaker_session)
 
     auto_ml = AutoML(
@@ -290,7 +295,7 @@ def test_candidate_estimator_rerun_with_optional_args(sagemaker_session):
         candidate_estimator.fit(inputs, encrypt_inter_container_traffic=True)
         auto_ml.deploy(
             initial_instance_count=INSTANCE_COUNT,
-            instance_type=HOSTING_INSTANCE_TYPE,
+            instance_type=cpu_instance_type,
             candidate=candidate,
             endpoint_name=endpoint_name,
         )

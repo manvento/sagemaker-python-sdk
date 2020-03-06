@@ -1,4 +1,4 @@
-# Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# Copyright 2018-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"). You
 # may not use this file except in compliance with the License. A copy of
@@ -14,7 +14,6 @@
 from __future__ import absolute_import
 
 import logging
-import os
 
 import sagemaker
 from sagemaker.content_types import CONTENT_TYPE_JSON
@@ -165,6 +164,12 @@ class Model(sagemaker.model.FrameworkModel):
                 SageMaker ``Session``. If specified, ``deploy()`` returns the
                 result of invoking this function on the created endpoint name.
             **kwargs: Keyword arguments passed to the ``Model`` initializer.
+
+        .. tip::
+
+            You can find additional parameters for initializing this class at
+            :class:`~sagemaker.model.FrameworkModel` and
+            :class:`~sagemaker.model.Model`.
         """
         super(Model, self).__init__(
             model_data=model_data,
@@ -223,7 +228,7 @@ class Model(sagemaker.model.FrameworkModel):
             key_prefix = sagemaker.fw_utils.model_code_key_prefix(self.key_prefix, self.name, image)
 
             bucket = self.bucket or self.sagemaker_session.default_bucket()
-            model_data = "s3://" + os.path.join(bucket, key_prefix, "model.tar.gz")
+            model_data = "s3://{}/{}/model.tar.gz".format(bucket, key_prefix)
 
             sagemaker.utils.repack_model(
                 self.entry_point,
@@ -269,3 +274,22 @@ class Model(sagemaker.model.FrameworkModel):
             self._framework_version,
             accelerator_type=accelerator_type,
         )
+
+    def serving_image_uri(
+        self, region_name, instance_type, accelerator_type=None
+    ):  # pylint: disable=unused-argument
+        """Create a URI for the serving image.
+
+        Args:
+            region_name (str): AWS region where the image is uploaded.
+            instance_type (str): SageMaker instance type. Used to determine device type
+                (cpu/gpu/family-specific optimized).
+            accelerator_type (str): The Elastic Inference accelerator type to
+                deploy to the instance for loading and making inferences to the
+                model (default: None). For example, 'ml.eia1.medium'.
+
+        Returns:
+            str: The appropriate image URI based on the given parameters.
+
+        """
+        return self._get_image_uri(instance_type=instance_type, accelerator_type=accelerator_type)

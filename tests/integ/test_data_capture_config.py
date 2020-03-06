@@ -1,4 +1,4 @@
-# Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"). You
 # may not use this file except in compliance with the License. A copy of
@@ -74,11 +74,11 @@ def test_enabling_data_capture_on_endpoint_shows_correct_data_capture_status(
         predictor.enable_data_capture()
 
         # Wait for endpoint to finish updating
-        # Endpoint update takes ~7min. 40 retries * 30s sleeps = 20min timeout
+        # Endpoint update takes ~7min. 25 retries * 60s sleeps = 25min timeout
         for _ in retries(
-            max_retry_count=40,
+            max_retry_count=25,
             exception_message_prefix="Waiting for 'InService' endpoint status",
-            seconds_to_sleep=30,
+            seconds_to_sleep=60,
         ):
             new_endpoint = sagemaker_session.sagemaker_client.describe_endpoint(
                 EndpointName=predictor.endpoint
@@ -126,6 +126,7 @@ def test_disabling_data_capture_on_endpoint_shows_correct_data_capture_status(
                 capture_options=CUSTOM_CAPTURE_OPTIONS,
                 csv_content_types=CUSTOM_CSV_CONTENT_TYPES,
                 json_content_types=CUSTOM_JSON_CONTENT_TYPES,
+                sagemaker_session=sagemaker_session,
             ),
         )
 
@@ -159,11 +160,11 @@ def test_disabling_data_capture_on_endpoint_shows_correct_data_capture_status(
         predictor.disable_data_capture()
 
         # Wait for endpoint to finish updating
-        # Endpoint update takes ~7min. 40 retries * 30s sleeps = 20min timeout
+        # Endpoint update takes ~7min. 25 retries * 60s sleeps = 25min timeout
         for _ in retries(
-            max_retry_count=40,
+            max_retry_count=25,
             exception_message_prefix="Waiting for 'InService' endpoint status",
-            seconds_to_sleep=30,
+            seconds_to_sleep=60,
         ):
             new_endpoint = sagemaker_session.sagemaker_client.describe_endpoint(
                 EndpointName=predictor.endpoint
@@ -224,15 +225,16 @@ def test_updating_data_capture_on_endpoint_shows_correct_data_capture_status(
                 capture_options=CUSTOM_CAPTURE_OPTIONS,
                 csv_content_types=CUSTOM_CSV_CONTENT_TYPES,
                 json_content_types=CUSTOM_JSON_CONTENT_TYPES,
+                sagemaker_session=sagemaker_session,
             )
         )
 
         # Wait for endpoint to finish updating
-        # Endpoint update takes ~7min. 40 retries * 30s sleeps = 20min timeout
+        # Endpoint update takes ~7min. 25 retries * 60s sleeps = 25min timeout
         for _ in retries(
-            max_retry_count=40,
+            max_retry_count=25,
             exception_message_prefix="Waiting for 'InService' endpoint status",
-            seconds_to_sleep=30,
+            seconds_to_sleep=60,
         ):
             new_endpoint = sagemaker_session.sagemaker_client.describe_endpoint(
                 EndpointName=predictor.endpoint
